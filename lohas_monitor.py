@@ -67,24 +67,22 @@ def calculate_kd(df):
     df['D'] = d
     return df['K'].iloc[-1], df['D'].iloc[-1]
 
-def send_line_notify(message):
+def send_telegram_message(message):
     """
-    將分析結果透過 LINE Notify API 推送到指定的群組或對話框
-    需在 GitHub Secrets 或系統環境變數中設定 LINE_TOKEN
+    將分析結果透過 Telegram Bot API 推送到指定的聊天室或群組
+    需在 GitHub Secrets 或系統環境變數中設定 TELEGRAM_TOKEN 與 TELEGRAM_CHAT_ID
     """
-    token = os.environ.get("LINE_TOKEN")
-    if not token:
-        print("💡 提示：未偵測到 LINE_TOKEN 環境變數，分析報告將僅於控制台輸出。")
+    token = os.environ.get("TELEGRAM_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        print("💡 提示：未偵測到 Telegram 設定，分析報告將僅於控制台輸出。")
         return
-        
-    url = "https://notify-api.line.me/api/notify"
-    headers = {"Authorization": f"Bearer {token}"}
-    data = {"message": message}
-    
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     try:
-        response = requests.post(url, headers=headers, data=data)
+        response = requests.post(url, json=payload)
         if response.status_code == 200:
-            print("🚀 LINE Notify 報告推送成功！")
+            print("🚀 Telegram 報告推送成功！")
         else:
             print(f"❌ 推送失敗，API 回報狀態碼: {response.status_code}")
     except Exception as e:
@@ -93,7 +91,17 @@ def send_line_notify(message):
 # ==============================================================================
 # ⚠️ 核心注意：下方的 stock_list 變數會被前端管理網頁 (GitHub Pages) 動態識別與修改。
 # 請保持本行 (第 106 行) 的基本宣告語法，網頁端會利用精準的正則表達式自動覆蓋此清單。
+# 改用 Telegram 伺服器通知，請記得在 GitHub Secrets 設定對應的 Token 與 Chat ID。
 # ==============================================================================
+
+
+
+
+
+
+
+
+
 stock_list = ["0050.TW", "2330.TW", "3711.TW", "8069.TWO", "6953.TWO", "3293.TWO", "6625.TW"]
 
 def main():
@@ -105,7 +113,6 @@ def main():
         try:
             print(f" 🔍 正在處理標的: {stock} ...")
             ticker = yf.Ticker(stock)
-            # 取近三個月日線資料計算五線譜與 KD
             df = ticker.history(period="3mo")
             
             if df.empty:
@@ -119,9 +126,8 @@ def main():
                 continue
                 
             has_valid_data = True
-            
-            # 位階判斷邏輯
             current_price = lohas['current']
+            
             if current_price <= lohas['dn2']:
                 position_status = "🔥 超跌 (低於極度悲觀線)"
             elif current_price <= lohas['dn1']:
@@ -141,8 +147,8 @@ def main():
     if has_valid_data:
         print("\n=== 本地端報告預覽 ===")
         print(report_msg)
-        # 如果您有設定 LINE 機器人，此行會自動把報告發到您手機上
-        send_line_notify(report_msg)
+        # 呼叫全新的 Telegram 發送函數
+        send_telegram_message(report_msg)
     else:
         print("❌ 本次執行未成功分析任何股票標的。")
 

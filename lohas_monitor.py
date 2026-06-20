@@ -10,22 +10,34 @@ from datetime import datetime
 # ==============================================================================
 # ⚙️ 策略參數自訂區（客製化個股看盤區間）
 # ==============================================================================
-# 1. 預設區間：如果網頁新增了「下方對照表沒寫到」的股票，一律採用這個預設區間
 DEFAULT_PERIOD = "1y" 
 
-# 2. 個股專屬對照表：在這裡指定每檔股票想要觀看的特殊區間
-# 可選：'3mo', '6mo', '1y', '2y', '3y', '5y'
 STOCK_PERIOD_MAP = {
-    "0050.TW": "3y",     # 元大台灣50：大盤型適合 3 年長線位階
-    "2330.TW": "3y",     # 台積電：長期發展大廠適合 3 年長線位階
-    "3293.TWO": "3mo",   # 鈊象：遊戲股高波動，適合 3 個月短線波段
-    "8069.TWO": "6mo",   # 元太：中短期題材波動，適合 6 個月波段
-    # 💡 未來有新想法，可以直接在下方依照格式手動新增，例如 "2454.TW": "1y",
+    "0050.TW": "3y",     # 元大台灣50
+    "2330.TW": "3y",     # 台積電
+    "3293.TWO": "3mo",   # 鈊象
+    "8069.TWO": "6mo",   # 元太
 }
 
 # ==============================================================================
 # 📈 樂活五線譜與技術指標監控自動化腳本 (LOHAS Monitor Bot)
 # ==============================================================================
+
+def get_stock_name(stock_code):
+    """
+    向 Yahoo Finance 搜尋端高速抓取該代碼的中文簡稱
+    """
+    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={stock_code}&quotesCount=1&newsCount=0"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("quotes") and len(data["quotes"]) > 0:
+                return data["quotes"][0].get("shortname", stock_code)
+    except Exception as e:
+        print(f"⚠️ 無法取得 {stock_code} 的中文名稱: {e}")
+    return stock_code  # 失敗時回傳原始代碼防呆
 
 def calculate_lohas_lines(df):
     """ 計算樂活五線譜的核心數學邏輯 """
@@ -113,7 +125,6 @@ def main():
             print(f" 🔍 正在處理標的: {stock} ...")
             ticker = yf.Ticker(stock)
             
-            # 🔥 核心改動：檢查對照表，有設定就用專屬區間，沒有就用預設值
             current_period = STOCK_PERIOD_MAP.get(stock, DEFAULT_PERIOD)
             df = ticker.history(period=current_period)
             
@@ -132,6 +143,9 @@ def main():
             current_price = lohas['current']
             channel_top = channel['top']
             channel_bottom = channel['bottom']
+            
+            # 💡 呼叫名稱翻譯工具，取得如「台積電」的名稱
+            stock_name = get_stock_name(stock)
             
             if current_price <= lohas['dn2']:
                 position_status = "🔥 超跌 (低於極度悲觀線)"
@@ -162,9 +176,9 @@ def main():
             else:
                 trade_signal = "⚪ 持有觀望 (常態均值區，無強烈買賣訊號)"
                 
-            # 💡 訊息呈現優化：在股票名稱後方加上它本次採用的計算區間 (例如：3y)
+            # 💡 訊息呈現優化：將股票名稱融合進報告標題中
             report_msg += (
-                f"\n【{stock}】({current_period}區間)\n"
+                f"\n【{stock_name} / {stock}】({current_period}區間)\n"
                 f" 💰 當前收盤: {current_price:.2f}\n"
                 f" 🎯 五線位階: {position_status}\n"
                 f" 🔮 通道範圍: {channel_bottom:.2f} ~ {channel_top:.2f}\n"

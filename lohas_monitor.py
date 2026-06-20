@@ -25,22 +25,29 @@ STOCK_PERIOD_MAP = {
 
 def get_stock_name(stock_code):
     """
-    🛠️ 修正點：改為精準解析 <title> 標籤，完美取得台灣上市櫃個股的繁體中文名稱
+    🔥 核心優化：結合內建精準繁中字典與官方繁中 JSON 通道，確保名稱解碼絕對正確
     """
-    pure_code = stock_code.split('.')[0]
-    url = f"https://tw.stock.yahoo.com/quote/{pure_code}"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    local_dict = {
+        "2330.TW": "台積電",
+        "0050.TW": "元大台灣50",
+        "3293.TWO": "鈊象",
+        "8069.TWO": "元太",
+        "3711.TW": "日月光投控",
+        "6953.TWO": "巧新",
+        "6625.TW": "必應"
+    }
+    if stock_code in local_dict:
+        return local_dict[stock_code]
+
+    # 若為未來新加入的股票，改走官方繁體中文 JSON API 管道
+    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={stock_code}&quotesCount=1&newsCount=0&lang=zh-Hant-TW&region=TW"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     try:
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
-            import re
-            match = re.search(r'<title[^>]*>([^<]+)</title>', res.text)
-            if match:
-                title_text = match.group(1).strip()
-                # 擷取空格或左括號前的中文名稱
-                name = re.split(r'[\s\(]', title_text)[0].strip()
-                if name and "Yahoo" not in name:
-                    return name
+            data = res.json()
+            if data.get("quotes") and len(data["quotes"]) > 0:
+                return data["quotes"][0].get("shortname") or data["quotes"][0].get("longname") or stock_code
     except Exception as e:
         print(f"⚠️ 無法取得 {stock_code} 的中文名稱: {e}")
     return stock_code
@@ -119,10 +126,10 @@ def send_telegram_message(message):
 
 
 
-stock_list = ["0050.TW","2330.TW","3711.TW","8069.TWO","6953.TWO","3293.TWO","6625.TW"]
+stock_list = ["0050.TW", "2330.TW", "3711.TW", "8069.TWO", "6953.TWO", "3293.TWO", "6625.TW"]
 
 def main():
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監控排程...")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監程排程...")
     report_msg = "\n📊 樂活盯盤量化分析報告 📊\n"
     has_valid_data = False
     

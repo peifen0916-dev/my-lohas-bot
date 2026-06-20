@@ -126,7 +126,7 @@ def send_telegram_message(message):
 
 
 
-stock_list = ["0050.TW", "2330.TW", "3711.TW", "8069.TWO", "6953.TWO", "3293.TWO", "6625.TW"]
+stock_list = ["0050.TW","2330.TW","3711.TW","8069.TWO","6953.TWO","3293.TWO","6625.TW","23742.TWO"]
 
 def main():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監程排程...")

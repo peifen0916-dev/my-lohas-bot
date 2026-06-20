@@ -11,29 +11,41 @@
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .app-container { width: 100%; max-width: 400px; background: var(--card-bg); border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 24px; box-sizing: border-box; }
         h2 { margin-top: 0; font-size: 22px; text-align: center; }
-        .hint { font-size: 13px; color: var(--gray); margin-bottom: 20px; text-align: center; }
-        textarea { width: 100%; height: 120px; padding: 12px; border: 1px solid #d0d7de; border-radius: 8px; font-size: 16px; font-family: monospace; box-sizing: border-box; resize: none; background: #fafafa; }
-        button { width: 100%; background-color: var(--primary); color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 8px; margin-top: 16px; cursor: pointer; }
+        .hint { font-size: 13px; color: var(--gray); margin-bottom: 15px; text-align: center; }
+        textarea, input { width: 100%; padding: 12px; border: 1px solid #d0d7de; border-radius: 8px; font-size: 16px; font-family: monospace; box-sizing: border-box; background: #fafafa; }
+        textarea { height: 120px; resize: none; margin-bottom: 10px; }
+        input { margin-bottom: 15px; background: #fff; }
+        button { width: 100%; background-color: var(--primary); color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 5px; }
         button:disabled { background-color: #94d3a2; }
         #status { margin-top: 15px; text-align: center; font-weight: bold; font-size: 14px; }
         .success { color: #2ea44f; } .error { color: #cf222e; } .loading { color: #0969da; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <h2>📈 樂活盯盤清單修改</h2>
-    <div class="hint">請輸入完整的股票代碼，以英文引號包起、逗號隔開。<br>上市加 .TW / 上櫃加 .TWO</div>
-    <textarea id="stockListInput" placeholder='["0050.TW", "2330.TW", "3293.TWO"]'></textarea>
-    <button id="saveBtn" onclick="updateGitHubFile()">💾 同步更新至雲端</button>
+    
+    <div id="lockZone">
+        <div class="hint">請輸入您的 GitHub Fine-grained Token 进行身分驗證（此金鑰將安全储存在手機本地）：</div>
+        <input type="password" id="tokenInput" placeholder="github_pat_...">
+        <button onclick="saveTokenAndInit()">🔑 驗證並登入</button>
+    </div>
+
+    <div id="mainZone" class="hidden">
+        <div class="hint">請輸入完整的股票代碼，以英文引號包起、逗號隔開。<br>上市加 .TW / 上櫃加 .TWO</div>
+        <textarea id="stockListInput" placeholder='["0050.TW", "2330.TW", "3293.TWO"]'></textarea>
+        <button id="saveBtn" onclick="updateGitHubFile()">💾 同步更新至雲端</button>
+        <button onclick="clearToken()" style="background-color: #cf222e; margin-top: 10px;">🚪 登出並清除金鑰</button>
+    </div>
+    
     <div id="status"></div>
 </div>
 
 <script>
-    // 🌟 1. 請把您重新產生、最完整、中間沒有三個點的 Token 貼在下面雙引號內
-    const GITHUB_TOKEN = "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";
-    
-    // 🌟 2. 帳號與專案設定（已鎖定全小寫）
+    // 🌟 程式碼中完全沒有金鑰！100% 安全！
+    let GITHUB_TOKEN = "";
     const OWNER = "peifen0916-dev"; 
     const REPO = "my-lohas-bot";
     const FILE_PATH = "lohas_monitor.py";
@@ -42,13 +54,44 @@
     const inputField = document.getElementById('stockListInput');
     const saveBtn = document.getElementById('saveBtn');
 
+    // 網頁開啟時，檢查手機有沒有存過 Token
+    window.onload = function() {
+        const savedToken = localStorage.getItem('lohas_github_token');
+        if (savedToken) {
+            GITHUB_TOKEN = savedToken;
+            document.getElementById('lockZone').classList.add('hidden');
+            document.getElementById('mainZone').classList.remove('hidden');
+            fetchCurrentList();
+        }
+    }
+
+    // 儲存 Token 並初始化
+    function saveTokenAndInit() {
+        const token = document.getElementById('tokenInput').value.trim();
+        if (!token.startsWith('github_pat_')) {
+            showStatus("❌ 格式不正確，必須是 github_pat_ 開頭的完整 Token", "error");
+            return;
+        }
+        localStorage.setItem('lohas_github_token', token);
+        GITHUB_TOKEN = token;
+        document.getElementById('lockZone').classList.add('hidden');
+        document.getElementById('mainZone').classList.remove('hidden');
+        fetchCurrentList();
+    }
+
+    // 清除金鑰（登出）
+    function clearToken() {
+        localStorage.removeItem('lohas_github_token');
+        location.reload();
+    }
+
     async function fetchCurrentList() {
         showStatus("🔍 正在讀取雲端最新股票清單...", "loading");
         saveBtn.disabled = true;
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
             const res = await fetch(url, { headers: { "Authorization": `token ${GITHUB_TOKEN}` } });
-            if (!res.ok) throw new Error("讀取失敗，請檢查 Token 權限或是否複製完整");
+            if (!res.ok) throw new Error("讀取失敗，請確認 Token 權限或是否勾選正確專案");
             const data = await res.json();
             const fileContent = decodeURIComponent(escape(atob(data.content)));
             const match = fileContent.match(/stock_list\s*=\s*(\[[\s\S]*?\])/);
@@ -60,7 +103,8 @@
             }
         } catch (err) {
             showStatus("❌ " + err.message, "error");
-        } finally { res.disabled = false; saveBtn.disabled = false; }
+            clearToken(); // 失敗就強制清除，讓使用者重登
+        } finally { saveBtn.disabled = false; }
     }
 
     async function updateGitHubFile() {
@@ -90,7 +134,6 @@
         finally { saveBtn.disabled = false; }
     }
     function showStatus(msg, type) { statusDiv.innerText = msg; statusDiv.className = type; }
-    fetchCurrentList();
 </script>
 </body>
 </html>

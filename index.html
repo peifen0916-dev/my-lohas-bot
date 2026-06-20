@@ -97,7 +97,7 @@
     const saveBtn = document.getElementById('saveBtn');
     
     let stockList = [];
-    const nameCache = {}; // 用於儲存股票代碼對應的中文名稱，例如 {"2330.TW": "台積電"}
+    const nameCache = {}; 
 
     window.onload = function() {
         const savedToken = localStorage.getItem('lohas_github_token');
@@ -127,28 +127,34 @@
         location.reload();
     }
 
-    // 透過跨域代理非同步向 Yahoo Finance 查詢股票中文名稱
+    // 🔥 核心改動：強制從台灣 Yahoo 奇摩股市的 HTML 中擷取最正宗的中文公司名稱
     async function fetchStockName(code) {
         if (nameCache[code]) return nameCache[code];
         try {
-            const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${code}&quotesCount=1&newsCount=0`;
+            const pureCode = code.split('.')[0];
+            const targetUrl = `https://tw.stock.yahoo.com/quote/${pureCode}`;
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
             const res = await fetch(proxyUrl);
-            const data = await res.json();
-            if (data.quotes && data.quotes.length > 0) {
-                nameCache[code] = data.quotes[0].shortname || code;
-                return nameCache[code];
+            const html = await res.text();
+            
+            // 透過正規表達式精準抓取 <h1> 標籤內的中文名稱
+            const match = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
+            if (match && match[1]) {
+                let name = match[1].trim();
+                // 清理可能附帶的尾隨代碼（例如 "台積電 (2330)" -> "台積電"）
+                name = name.replace(/\s*\([\d\w.]+\)/g, '').split(' ')[0].trim();
+                nameCache[code] = name;
+                return name;
             }
         } catch (e) { console.error("無法取得名稱:", e); }
-        return code;
+        return code; 
     }
 
-    // 渲染介面 (支援非同步加載中文名稱)
+    // 渲染介面
     function renderUI() {
         const container = document.getElementById('stockContainer');
         const select = document.getElementById('deleteSelect');
         
-        // 1. 先用代碼快速渲染標籤，避免畫面卡頓
         if (stockList.length === 0) {
             container.innerHTML = '<span style="color: #6a737d; font-size: 14px;">目前清單空空如也</span>';
         } else {
@@ -158,7 +164,6 @@
             }).join('');
         }
 
-        // 2. 刷新刪除選單
         select.innerHTML = '<option value="">請選擇股票...</option>';
         stockList.forEach(stock => {
             const option = document.createElement('option');
@@ -168,7 +173,7 @@
             select.appendChild(option);
         });
 
-        // 3. 幕後偷偷向雲端查名稱，查到後自動動態補上中文名字！
+        // 異步動態補正中文名稱
         stockList.forEach(async (stock) => {
             if (!nameCache[stock]) {
                 const name = await fetchStockName(stock);
@@ -180,7 +185,7 @@
         });
     }
 
-    // 智慧型搜尋功能
+    // 智慧型搜尋功能（支援前五筆即時中文並行轉譯）
     async function searchStock() {
         const query = document.getElementById('addInput').value.trim();
         if (!query) { alert('請輸入股票名稱或代碼！'); return; }
@@ -189,7 +194,7 @@
         const select = document.getElementById('searchResultSelect');
         
         searchBtn.disabled = true;
-        searchBtn.innerText = "搜尋中...";
+        searchBtn.innerText = "🔍 解碼中...";
         
         try {
             const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=5&newsCount=0&lang=zh-TW&region=TW`;
@@ -201,11 +206,24 @@
             select.innerHTML = '<option value="">請點選下方符合的股票加入...</option>';
             
             if (data.quotes && data.quotes.length > 0) {
-                data.quotes.forEach(q => {
+                // 🔥 核心優化：利用 Promise.all 同步在背景向台灣 Yahoo 查詢這 5 筆資料的中文名字
+                const promises = data.quotes.slice(0, 5).map(async (q) => {
+                    if (q.symbol.endsWith('.TW') || q.symbol.endsWith('.TWO')) {
+                        const cName = await fetchStockName(q.symbol);
+                        q.chineseName = cName;
+                    } else {
+                        q.chineseName = q.shortname;
+                    }
+                    return q;
+                });
+                
+                const resolvedQuotes = await Promise.all(promises);
+                
+                resolvedQuotes.forEach(q => {
                     const option = document.createElement('option');
                     option.value = q.symbol;
-                    if (q.shortname) nameCache[q.symbol] = q.shortname; // 順便存入快取
-                    option.textContent = `${q.shortname || '未知名稱'} (${q.symbol}) - ${q.exchDisp || ''}`;
+                    // 下拉選單直接呈現中文名稱！
+                    option.textContent = `${q.chineseName || q.shortname} (${q.symbol}) - ${q.exchDisp || ''}`;
                     select.appendChild(option);
                 });
                 select.classList.remove('hidden');
@@ -221,7 +239,6 @@
         }
     }
 
-    // 使用者點選搜尋結果後觸發加入
     function confirmAddStock() {
         const select = document.getElementById('searchResultSelect');
         const code = select.value;
@@ -237,7 +254,7 @@
         document.getElementById('addInput').value = '';
         select.classList.add('hidden');
         select.value = "";
-        renderUI(); // 重新整理畫面
+        renderUI();
     }
 
     function deleteStock() {
@@ -288,7 +305,7 @@
             const updateRes = await fetch(url, {
                 method: "PUT",
                 headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "📱 智慧搜尋功能介面優化更新", content: b64Content, sha: sha })
+                body: JSON.stringify({ message: "📱 智慧中文名稱搜尋功能更新", content: b64Content, sha: sha })
             });
             if (updateRes.ok) { 
                 showStatus("🎉 雲端股票名單已秒速更新成功！", "success"); 

@@ -103,7 +103,7 @@ def send_telegram_msg(token, chat_id, text):
 
 if __name__ == "__main__":
     # 這裡可以自由增減您想追蹤的股票清單（台股、美股皆可）
-    stock_list = ["0050.TW", "2330.TW", "3711.TW","8069.TWO","6953.TWO","3293.TWO“,"6625.TW"]
+    stock_list = ["0050.TW", "2330.TW", "3711.TW","8069.TWO","6953.TWO","3293.TWO“ , "6625.TW"]
     
     total_report = "🤖 【樂活五線譜 3.5年版每日追蹤報告】\n"
     print("🤖 正在計算並發送 Telegram 報告...")

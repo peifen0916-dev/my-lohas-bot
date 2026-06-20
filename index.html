@@ -96,19 +96,8 @@
     const statusDiv = document.getElementById('status');
     const saveBtn = document.getElementById('saveBtn');
     
-    let stockList = [];
-    const nameCache = {}; 
-
-    // 內建核心對照表（已修正家碩）
-    const localStockDict = {
-        "2330.TW": "台積電",
-        "0050.TW": "元大台灣50",
-        "3293.TWO": "鈊象",
-        "8069.TWO": "元太",
-        "3711.TW": "日月光投控",
-        "6953.TWO": "家碩",
-        "6625.TW": "必應"
-    };
+    // 🔥 核心改變：不再使用陣列，改用「物件 (Dictionary)」直接同時存放代碼與中文名稱！
+    let stockDict = {}; 
 
     window.onload = function() {
         const savedToken = localStorage.getItem('lohas_github_token');
@@ -138,59 +127,26 @@
         location.reload();
     }
 
-    // 備用非同步獲取名稱 API
-    async function fetchStockName(code) {
-        if (localStockDict[code]) return localStockDict[code];
-        if (nameCache[code]) return nameCache[code];
-        try {
-            const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${code}&quotesCount=1&newsCount=0&lang=zh-Hant-TW&region=TW`;
-            // 🔥 升級點 1：改用速度極快的 corsproxy.io 代理通道
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-            const res = await fetch(proxyUrl);
-            const data = await res.json();
-            
-            if (data.quotes && data.quotes.length > 0) {
-                const name = data.quotes[0].shortname || data.quotes[0].longname || code;
-                nameCache[code] = name;
-                return name;
-            }
-        } catch (e) { console.error("無法取得名稱:", e); }
-        return code; 
-    }
-
-    // 渲染介面
+    // 渲染介面 (此時完全不需要任何背景載入或內建對照表，名字直接從雲端打包帶下來)
     function renderUI() {
         const container = document.getElementById('stockContainer');
         const select = document.getElementById('deleteSelect');
+        const codes = Object.keys(stockDict);
         
-        if (stockList.length === 0) {
-            container.innerHTML = '<span style="color: #6a737d; font-size: 14px;">目清單空空如也</span>';
+        if (codes.length === 0) {
+            container.innerHTML = '<span style="color: #6a737d; font-size: 14px;">目前清單空空如也</span>';
         } else {
-            container.innerHTML = stockList.map(stock => {
-                const displayName = localStockDict[stock] || nameCache[stock] || stock;
-                const title = displayName !== stock ? `${displayName} (${stock})` : stock;
-                return `<span class="stock-tag" id="tag-${stock.replace('.', '_')}">${title}</span>`;
+            container.innerHTML = codes.map(code => {
+                return `<span class="stock-tag">${stockDict[code]} (${code})</span>`;
             }).join('');
         }
 
         select.innerHTML = '<option value="">請選擇股票...</option>';
-        stockList.forEach(stock => {
+        codes.forEach(code => {
             const option = document.createElement('option');
-            option.value = stock;
-            option.id = `opt-${stock.replace('.', '_')}`;
-            const displayName = localStockDict[stock] || nameCache[stock] || stock;
-            option.textContent = displayName !== stock ? `${displayName} (${stock})` : stock;
+            option.value = code;
+            option.textContent = `${stockDict[code]} (${code})`;
             select.appendChild(option);
-        });
-
-        stockList.forEach(async (stock) => {
-            if (!localStockDict[stock] && !nameCache[stock]) {
-                const name = await fetchStockName(stock);
-                const tagEl = document.getElementById(`tag-${stock.replace('.', '_')}`);
-                if (tagEl) tagEl.textContent = `${name} (${stock})`;
-                const optEl = document.getElementById(`opt-${stock.replace('.', '_')}`);
-                if (optEl) optEl.textContent = `${name} (${stock})`;
-            }
         });
     }
 
@@ -207,7 +163,6 @@
         
         try {
             const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=5&newsCount=0&lang=zh-Hant-TW&region=TW`;
-            // 🔥 升級點 1：改用速度極快的 corsproxy.io 代理通道
             const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
             
             const res = await fetch(proxyUrl);
@@ -219,36 +174,29 @@
                 data.quotes.forEach(q => {
                     const option = document.createElement('option');
                     option.value = q.symbol;
-                    const finalName = localStockDict[q.symbol] || q.shortname || q.longname || '未知名稱';
-                    nameCache[q.symbol] = finalName;
+                    const finalName = q.shortname || q.longname || query;
+                    // 將中文名字暫存到 option 的自訂屬性中
+                    option.setAttribute('data-name', finalName);
                     option.textContent = `${finalName} (${q.symbol}) - ${q.exchDisp || ''}`;
                     select.appendChild(option);
                 });
                 select.classList.remove('hidden');
             } else {
-                throw new Error("找不到相符股票");
+                throw new Error("找不到股票");
             }
         } catch (err) {
-            // 🔥 升級點 2：終極防禦！若搜尋伺服器故障，允許使用者「直接暴力手動加入」
+            // 🔥 終極防禦：萬一第三方伺服器又塞車，直接讓使用者手動輸入名字，完美防呆！
             let formattedCode = query.toUpperCase();
             if (!formattedCode.includes('.')) {
-                // 自動防呆：幫忙猜測後綴，如果是4碼通常是上市(.TW)
                 formattedCode += (formattedCode.length === 4) ? ".TW" : "";
             }
             
-            let confirmForce = confirm(
-                `💡 雲端搜尋轉運站正忙碌中 (Failed to fetch)。\n\n您是否要跳過搜尋，直接將「${formattedCode}」強制加入清單？\n(上市請加.TW，上櫃請加.TWO)`
-            );
-            
-            if (confirmForce) {
-                if (stockList.includes(formattedCode)) {
-                    alert('該股票已經在清單中囉！');
-                } else {
-                    stockList.push(formattedCode);
-                    document.getElementById('addInput').value = '';
-                    renderUI();
-                    showStatus("⚠️ 已手動強制加入代碼，請記得點擊同步更新！", "error");
-                }
+            let customName = prompt(`💡 雲端搜尋忙碌中。是否要直接強制加入代碼「${formattedCode}」？\n\n請輸入這檔股票的中文名稱：`, "新股票");
+            if (customName) {
+                stockDict[formattedCode] = customName.trim();
+                document.getElementById('addInput').value = '';
+                renderUI();
+                showStatus("⚠️ 已手動強制加入，請記得點擊同步更新！", "error");
             }
             select.classList.add('hidden');
         } finally {
@@ -262,13 +210,17 @@
         const code = select.value;
         if (!code) return;
         
-        if (stockList.includes(code)) {
+        if (stockDict[code]) {
             alert('該股票已經在清單中囉！');
             select.value = "";
             return;
         }
         
-        stockList.push(code);
+        // 從選中的 option 中直接拔出中文名字
+        const selectedOption = select.options[select.selectedIndex];
+        const name = selectedOption.getAttribute('data-name');
+        
+        stockDict[code] = name; // 存入字典
         document.getElementById('addInput').value = '';
         select.classList.add('hidden');
         select.value = "";
@@ -279,7 +231,7 @@
         const select = document.getElementById('deleteSelect');
         let target = select.value;
         if (!target) { alert('請先選取一檔要刪除的股票！'); return; }
-        stockList = stockList.filter(item => item !== target);
+        delete stockDict[target]; // 從字典中移除
         renderUI();
     }
 
@@ -289,14 +241,14 @@
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
             const res = await fetch(url, { headers: { "Authorization": `token ${GITHUB_TOKEN}` } });
-            if (!res.ok) throw new Error("讀取失敗，請確認 Token 權限或是否勾選正確專案");
+            if (!res.ok) throw new Error("讀取失敗");
             const data = await res.json();
             const fileContent = decodeURIComponent(escape(atob(data.content)));
-            const match = fileContent.match(/stock_list\s*=\s*(\[[\s\S]*?\])/);
+            // 🔥 匹配 Python 的 stock_dict 字典
+            const match = fileContent.match(/stock_dict\s*=\s*(\{[\s\S]*?\})/);
             
             if (match) {
-                let rawArrayStr = match[1].replace(/'/g, '"').replace(/“|”/g, '"');
-                stockList = JSON.parse(rawArrayStr);
+                stockDict = JSON.parse(match[1]);
                 renderUI();
                 showStatus("✅ 已同步最新雲端資料", "success");
             } else {
@@ -309,7 +261,7 @@
     }
 
     async function updateGitHubFile() {
-        const newListText = JSON.stringify(stockList); 
+        const newListText = JSON.stringify(stockDict); 
         showStatus("🚀 正在送出更新至 GitHub...", "loading");
         saveBtn.disabled = true;
         try {
@@ -318,12 +270,13 @@
             const fileData = await res.json();
             const sha = fileData.sha;
             const oldContent = decodeURIComponent(escape(atob(fileData.content)));
-            const newContent = oldContent.replace(/stock_list\s*=\s*\[[\s\S]*?\]/, `stock_list = ${newListText}`);
+            // 🔥 精準覆蓋 Python 檔案中的 stock_dict
+            const newContent = oldContent.replace(/stock_dict\s*=\s*\{[\s\S]*?\}/, `stock_dict = ${newListText}`);
             const b64Content = btoa(unescape(encodeURIComponent(newContent)));
             const updateRes = await fetch(url, {
                 method: "PUT",
                 headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "📱 升級高速代理與手動強制防呆加入機制", content: b64Content, sha: sha })
+                body: JSON.stringify({ message: "📱 終極輕量化動態名稱同步更新", content: b64Content, sha: sha })
             });
             if (updateRes.ok) { 
                 showStatus("🎉 雲端股票名單已秒速更新成功！", "success"); 

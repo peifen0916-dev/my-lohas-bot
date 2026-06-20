@@ -96,7 +96,6 @@
     const statusDiv = document.getElementById('status');
     const saveBtn = document.getElementById('saveBtn');
     
-    // 🔥 核心改變：不再使用陣列，改用「物件 (Dictionary)」直接同時存放代碼與中文名稱！
     let stockDict = {}; 
 
     window.onload = function() {
@@ -127,7 +126,7 @@
         location.reload();
     }
 
-    // 渲染介面 (此時完全不需要任何背景載入或內建對照表，名字直接從雲端打包帶下來)
+    // 渲染介面
     function renderUI() {
         const container = document.getElementById('stockContainer');
         const select = document.getElementById('deleteSelect');
@@ -175,7 +174,6 @@
                     const option = document.createElement('option');
                     option.value = q.symbol;
                     const finalName = q.shortname || q.longname || query;
-                    // 將中文名字暫存到 option 的自訂屬性中
                     option.setAttribute('data-name', finalName);
                     option.textContent = `${finalName} (${q.symbol}) - ${q.exchDisp || ''}`;
                     select.appendChild(option);
@@ -185,7 +183,6 @@
                 throw new Error("找不到股票");
             }
         } catch (err) {
-            // 🔥 終極防禦：萬一第三方伺服器又塞車，直接讓使用者手動輸入名字，完美防呆！
             let formattedCode = query.toUpperCase();
             if (!formattedCode.includes('.')) {
                 formattedCode += (formattedCode.length === 4) ? ".TW" : "";
@@ -205,6 +202,7 @@
         }
     }
 
+    // 🔥 核心優化點：當點選下拉選單加入股票時，強制彈出對話框讓使用者確認/修改繁體中文名字
     function confirmAddStock() {
         const select = document.getElementById('searchResultSelect');
         const code = select.value;
@@ -216,11 +214,25 @@
             return;
         }
         
-        // 從選中的 option 中直接拔出中文名字
         const selectedOption = select.options[select.selectedIndex];
-        const name = selectedOption.getAttribute('data-name');
+        const detectedName = selectedOption.getAttribute('data-name');
         
-        stockDict[code] = name; // 存入字典
+        // 跳出提示框，預填 Yahoo 給的名字（可能是英文），方便使用者當場修正為繁體中文
+        let userConfirmedName = prompt(
+            `已選取代碼: ${code}\n\n請確認或修改要在網頁與 Telegram 顯示的中文名稱：`, 
+            detectedName
+        );
+        
+        // 如果使用者點擊「取消」，就不加入
+        if (userConfirmedName === null) {
+            select.value = "";
+            return;
+        }
+        
+        // 確保有名稱，若留空則用自動偵測的名字
+        const finalName = userConfirmedName.trim() ? userConfirmedName.trim() : detectedName;
+        
+        stockDict[code] = finalName; 
         document.getElementById('addInput').value = '';
         select.classList.add('hidden');
         select.value = "";
@@ -231,7 +243,7 @@
         const select = document.getElementById('deleteSelect');
         let target = select.value;
         if (!target) { alert('請先選取一檔要刪除的股票！'); return; }
-        delete stockDict[target]; // 從字典中移除
+        delete stockDict[target]; 
         renderUI();
     }
 
@@ -244,7 +256,6 @@
             if (!res.ok) throw new Error("讀取失敗");
             const data = await res.json();
             const fileContent = decodeURIComponent(escape(atob(data.content)));
-            // 🔥 匹配 Python 的 stock_dict 字典
             const match = fileContent.match(/stock_dict\s*=\s*(\{[\s\S]*?\})/);
             
             if (match) {
@@ -270,13 +281,12 @@
             const fileData = await res.json();
             const sha = fileData.sha;
             const oldContent = decodeURIComponent(escape(atob(fileData.content)));
-            // 🔥 精準覆蓋 Python 檔案中的 stock_dict
             const newContent = oldContent.replace(/stock_dict\s*=\s*\{[\s\S]*?\}/, `stock_dict = ${newListText}`);
             const b64Content = btoa(unescape(encodeURIComponent(newContent)));
             const updateRes = await fetch(url, {
                 method: "PUT",
                 headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "📱 終極輕量化動態名稱同步更新", content: b64Content, sha: sha })
+                body: JSON.stringify({ message: "📱 升級自訂中文名稱加入機制", content: b64Content, sha: sha })
             });
             if (updateRes.ok) { 
                 showStatus("🎉 雲端股票名單已秒速更新成功！", "success"); 

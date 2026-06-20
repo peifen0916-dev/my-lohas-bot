@@ -25,19 +25,25 @@ STOCK_PERIOD_MAP = {
 
 def get_stock_name(stock_code):
     """
-    向 Yahoo Finance 搜尋端高速抓取該代碼的中文簡稱
+    🔥 核心改動：直接向台灣 Yahoo 奇摩股市網頁端動態爬取該代碼的中文名稱
     """
-    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={stock_code}&quotesCount=1&newsCount=0"
+    pure_code = stock_code.split('.')[0]
+    url = f"https://tw.stock.yahoo.com/quote/{pure_code}"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
     try:
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
-            data = res.json()
-            if data.get("quotes") and len(data["quotes"]) > 0:
-                return data["quotes"][0].get("shortname", stock_code)
+            import re
+            # 使用正規表達式撈取 <h1> 標籤中的中文股票名稱
+            match = re.search(r'<h1[^>]*>([^<]+)</h1>', res.text)
+            if match:
+                name = match.group(1).strip()
+                # 移除可能夾帶的括號與代號（例如 "台積電 (2330)" -> "台積電"）
+                name = re.sub(r'\s*\([\d\w.]+\)', '', name).split(' ')[0].strip()
+                return name
     except Exception as e:
         print(f"⚠️ 無法取得 {stock_code} 的中文名稱: {e}")
-    return stock_code  # 失敗時回傳原始代碼防呆
+    return stock_code  # 失敗時回傳原始代碼兜底
 
 def calculate_lohas_lines(df):
     """ 計算樂活五線譜的核心數學邏輯 """
@@ -113,7 +119,7 @@ def send_telegram_message(message):
 
 
 
-stock_list = ["0050.TW","3711.TW","8069.TWO","6953.TWO","3293.TWO","6625.TW","2330.TW"]
+stock_list = ["0050.TW", "2330.TW", "3711.TW", "8069.TWO", "6953.TWO", "3293.TWO", "6625.TW"]
 
 def main():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監控排程...")
@@ -144,7 +150,7 @@ def main():
             channel_top = channel['top']
             channel_bottom = channel['bottom']
             
-            # 💡 呼叫名稱翻譯工具，取得如「台積電」的名稱
+            # 💡 呼叫全新的名稱翻譯工具，取得如「台積電」的名稱
             stock_name = get_stock_name(stock)
             
             if current_price <= lohas['dn2']:
@@ -176,7 +182,7 @@ def main():
             else:
                 trade_signal = "⚪ 持有觀望 (常態均值區，無強烈買賣訊號)"
                 
-            # 💡 訊息呈現優化：將股票名稱融合進報告標題中
+            # 💡 訊息呈現優化：將繁體中文名稱完美融合進報告標題中
             report_msg += (
                 f"\n【{stock_name} / {stock}】({current_period}區間)\n"
                 f" 💰 當前收盤: {current_price:.2f}\n"

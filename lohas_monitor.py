@@ -12,8 +12,8 @@ from datetime import datetime
 # 功能說明：
 # 1. 透過 yfinance 爬取歷史股價資料。
 # 2. 自動計算線性回歸趨勢線，並推導出正負 1、2 倍標準差之樂活五線譜。
-# 3. 計算 9 日 RSV 與技術指標 KD 值。
-# 4. 判斷目前價格位階是否處於超跌或超漲區間，並輸出分析報告。
+# 3. 計算樂活通道（20日最高價平均線、20日最低價平均線）。
+# 4. 判斷目前價格位階，並結合五線譜與通道給出【買進、賣出、持有】訊號。
 # ==============================================================================
 
 def calculate_lohas_lines(df):
@@ -40,6 +40,21 @@ def calculate_lohas_lines(df):
         'dn1': reg_line[-1] - 1 * std_dev,
         'dn2': reg_line[-1] - 2 * std_dev,
         'current': prices[-1]
+    }
+
+def calculate_lohas_channel(df):
+    """
+    計算樂活通道：20日最高價平均（通道上線）與 20日最低價平均（通道下線）
+    """
+    if len(df) < 20:
+        return None
+        
+    ma20_high = df['High'].rolling(window=20).mean().iloc[-1]
+    ma20_low = df['Low'].rolling(window=20).mean().iloc[-1]
+    
+    return {
+        'top': ma20_high,
+        'bottom': ma20_low
     }
 
 def calculate_kd(df):
@@ -70,7 +85,6 @@ def calculate_kd(df):
 def send_telegram_message(message):
     """
     將分析結果透過 Telegram Bot API 推送到指定的聊天室或群組
-    需在 GitHub Secrets 或系統環境變數中設定 TELEGRAM_TOKEN 與 TELEGRAM_CHAT_ID
     """
     token = os.environ.get("TELEGRAM_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
@@ -120,26 +134,57 @@ def main():
                 continue
                 
             lohas = calculate_lohas_lines(df)
+            channel = calculate_lohas_channel(df)
             k_val, d_val = calculate_kd(df)
             
-            if not lohas:
+            if not lohas or not channel:
                 continue
                 
             has_valid_data = True
             current_price = lohas['current']
+            channel_top = channel['top']
+            channel_bottom = channel['bottom']
             
+            # 1. 判斷五線譜位階與多空區間屬性
             if current_price <= lohas['dn2']:
                 position_status = "🔥 超跌 (低於極度悲觀線)"
+                price_zone = "low"
             elif current_price <= lohas['dn1']:
                 position_status = "📉 偏低 (低於相對悲觀線)"
+                price_zone = "low"
             elif current_price >= lohas['up2']:
                 position_status = "⚠️ 超漲 (高於極度樂觀線)"
+                price_zone = "high"
             elif current_price >= lohas['up1']:
                 position_status = "📈 偏高 (高於相對樂觀線)"
+                price_zone = "high"
             else:
                 position_status = "⚖️ 正常 (常態均值區間)"
+                price_zone = "normal"
                 
-            report_msg += f"\n【{stock}】\n 💰 當前收盤: {current_price:.2f}\n 🎯 樂活位階: {position_status}\n 📊 技術指標: K={k_val:.1f} / D={d_val:.1f}\n"
+            # 2. 結合樂活通道進行進階判讀 (經典薛兆亨策略)
+            if price_zone == "low":
+                if current_price > channel_top:
+                    trade_signal = "🟢 買進訊號 (低檔轉強，突破通道上線)"
+                else:
+                    trade_signal = "🟡 低檔觀望 (悲觀區徘徊，尚未突破通道上線)"
+            elif price_zone == "high":
+                if current_price < channel_bottom:
+                    trade_signal = "🔴 賣出訊號 (高檔轉弱，跌破通道下線)"
+                else:
+                    trade_signal = "🔵 續抱持有 (樂觀區讓獲利奔跑，未跌破通道)"
+            else:
+                trade_signal = "⚪ 持有觀望 (常態均值區，無強烈買賣訊號)"
+                
+            # 3. 組裝訊息文字
+            report_msg += (
+                f"\n【{stock}】\n"
+                f" 💰 當前收盤: {current_price:.2f}\n"
+                f" 🎯 五線位階: {position_status}\n"
+                f" 🔮 通道範圍: {channel_bottom:.2f} ~ {channel_top:.2f}\n"
+                f" ⚡ 操盤訊號: {trade_signal}\n"
+                f" 📊 技術指標: K={k_val:.1f} / D={d_val:.1f}\n"
+            )
             
         except Exception as e:
             print(f"❌ 處理標的 {stock} 時發生非預期錯誤: {e}")
@@ -147,7 +192,6 @@ def main():
     if has_valid_data:
         print("\n=== 本地端報告預覽 ===")
         print(report_msg)
-        # 呼叫全新的 Telegram 發送函數
         send_telegram_message(report_msg)
     else:
         print("❌ 本次執行未成功分析任何股票標的。")

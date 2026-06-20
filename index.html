@@ -6,69 +6,17 @@
     <title>樂活股票清單管理</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://img.icons8.com/fluent/180/000000/stock-market.png">
-    
     <style>
-        :root {
-            --bg-color: #f4f6f9;
-            --card-bg: #ffffff;
-            --primary: #2ea44f;
-            --text: #24292e;
-            --gray: #6a737d;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .app-container {
-            width: 100%;
-            max-width: 400px;
-            background: var(--card-bg);
-            border-radius: 16px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            padding: 24px;
-            box-sizing: border-box;
-        }
-        h2 { margin-top: 0; font-size: 22px; text-align: center; color: #1f2328; }
+        :root { --bg-color: #f4f6f9; --card-bg: #ffffff; --primary: #2ea44f; --text: #24292e; --gray: #6a737d; }
+        body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .app-container { width: 100%; max-width: 400px; background: var(--card-bg); border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 24px; box-sizing: border-box; }
+        h2 { margin-top: 0; font-size: 22px; text-align: center; }
         .hint { font-size: 13px; color: var(--gray); margin-bottom: 20px; text-align: center; }
-        textarea {
-            width: 100%;
-            height: 120px;
-            padding: 12px;
-            border: 1px solid #d0d7de;
-            border-radius: 8px;
-            font-size: 16px;
-            font-family: monospace;
-            box-sizing: border-box;
-            resize: none;
-            background: #fafafa;
-        }
-        textarea:focus { border-color: var(--primary); outline: none; background: #fff; }
-        button {
-            width: 100%;
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 14px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            margin-top: 16px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:active { background-color: #2c974b; }
-        button:disabled { background-color: #94d3a2; cursor: not-allowed; }
+        textarea { width: 100%; height: 120px; padding: 12px; border: 1px solid #d0d7de; border-radius: 8px; font-size: 16px; font-family: monospace; box-sizing: border-box; resize: none; background: #fafafa; }
+        button { width: 100%; background-color: var(--primary); color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 8px; margin-top: 16px; cursor: pointer; }
+        button:disabled { background-color: #94d3a2; }
         #status { margin-top: 15px; text-align: center; font-weight: bold; font-size: 14px; }
-        .success { color: #2ea44f; }
-        .error { color: #cf222e; }
-        .loading { color: #0969da; }
+        .success { color: #2ea44f; } .error { color: #cf222e; } .loading { color: #0969da; }
     </style>
 </head>
 <body>
@@ -76,18 +24,16 @@
 <div class="app-container">
     <h2>📈 樂活盯盤清單修改</h2>
     <div class="hint">請輸入完整的股票代碼，以英文引號包起、逗號隔開。<br>上市加 .TW / 上櫃加 .TWO</div>
-    
     <textarea id="stockListInput" placeholder='["0050.TW", "2330.TW", "3293.TWO"]'></textarea>
-    
     <button id="saveBtn" onclick="updateGitHubFile()">💾 同步更新至雲端</button>
     <div id="status"></div>
 </div>
 
 <script>
-    // 🌟 請把剛才申請到的 github_pat_ 鑰匙原封不動貼在下方雙引號內
+    // 🌟 1. 請把您重新產生、最完整、中間沒有三個點的 Token 貼在下面雙引號內
     const GITHUB_TOKEN = "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";
     
-    // 🌟 請填入您的 GitHub 帳號與專案名稱
+    // 🌟 2. 帳號與專案設定（已鎖定全小寫）
     const OWNER = "peifen0916-dev"; 
     const REPO = "my-lohas-bot";
     const FILE_PATH = "lohas_monitor.py";
@@ -96,20 +42,15 @@
     const inputField = document.getElementById('stockListInput');
     const saveBtn = document.getElementById('saveBtn');
 
-    // 網頁開啟時，自動去 GitHub 抓取目前的股票清單顯示在畫面上
     async function fetchCurrentList() {
         showStatus("🔍 正在讀取雲端最新股票清單...", "loading");
         saveBtn.disabled = true;
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
-            const res = await fetch(url, {
-                headers: { "Authorization": `token ${GITHUB_TOKEN}` }
-            });
-            if (!res.ok) throw new Error("讀取失敗");
+            const res = await fetch(url, { headers: { "Authorization": `token ${GITHUB_TOKEN}` } });
+            if (!res.ok) throw new Error("讀取失敗，請檢查 Token 權限或是否複製完整");
             const data = await res.json();
             const fileContent = decodeURIComponent(escape(atob(data.content)));
-            
-            // 透過正規表達式，精準抓出 stock_list = [...] 的內容
             const match = fileContent.match(/stock_list\s*=\s*(\[[\s\S]*?\])/);
             if (match) {
                 inputField.value = match[1].replace(/\s+/g, ' ');
@@ -118,73 +59,38 @@
                 showStatus("❌ 找不到股票清單變數", "error");
             }
         } catch (err) {
-            showStatus("❌ 無法連線至 GitHub: " + err.message, "error");
-        } finally {
-            saveBtn.disabled = false;
-        }
+            showStatus("❌ " + err.message, "error");
+        } finally { res.disabled = false; saveBtn.disabled = false; }
     }
 
-    // 點擊按鈕時，打包新清單並寫回 GitHub
     async function updateGitHubFile() {
         const newListText = inputField.value.trim();
-        
-        // 基礎防呆驗證
         if (!newListText.startsWith('[') || !newListText.endsWith(']')) {
             showStatus("❌ 格式錯誤！必須以 [ 開頭，] 結尾", "error");
             return;
         }
-
         showStatus("🚀 正在送出更新至 GitHub...", "loading");
         saveBtn.disabled = true;
-
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
-            const res = await fetch(url, {
-                headers: { "Authorization": `token ${GITHUB_TOKEN}` }
-            });
+            const res = await fetch(url, { headers: { "Authorization": `token ${GITHUB_TOKEN}` } });
             const fileData = await res.json();
             const sha = fileData.sha;
             const oldContent = decodeURIComponent(escape(atob(fileData.content)));
-
-            // 替換股票清單
             const newContent = oldContent.replace(/stock_list\s*=\s*\[[\s\S]*?\]/, `stock_list = ${newListText}`);
-
-            // 將新檔案內容轉成 Base64 編碼送回 GitHub
             const b64Content = btoa(unescape(encodeURIComponent(newContent)));
-
             const updateRes = await fetch(url, {
                 method: "PUT",
-                headers: {
-                    "Authorization": `token ${GITHUB_TOKEN}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    message: "📱 經由手機管理後台更新股票清單",
-                    content: b64Content,
-                    sha: sha
-                })
+                headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ message: "📱 手機後台更新", content: b64Content, sha: sha })
             });
-
-            if (updateRes.ok) {
-                showStatus("🎉 雲端股票名單已秒速更新成功！", "success");
-            } else {
-                throw new Error("GitHub 回報錯誤");
-            }
-        } catch (err) {
-            showStatus("❌ 更新失敗: " + err.message, "error");
-        } finally {
-            saveBtn.disabled = false;
-        }
+            if (updateRes.ok) { showStatus("🎉 雲端股票名單已秒速更新成功！", "success"); } 
+            else { throw new Error("GitHub 回報錯誤"); }
+        } catch (err) { showStatus("❌ 更新失敗: " + err.message, "error"); } 
+        finally { saveBtn.disabled = false; }
     }
-
-    function showStatus(msg, type) {
-        statusDiv.innerText = msg;
-        statusDiv.className = type;
-    }
-
-    // 初始載入
+    function showStatus(msg, type) { statusDiv.innerText = msg; statusDiv.className = type; }
     fetchCurrentList();
 </script>
-
 </body>
 </html>

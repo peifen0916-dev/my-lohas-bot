@@ -99,7 +99,7 @@
     let stockList = [];
     const nameCache = {}; 
 
-    // 🔥 核心優化：內建核心對照表，讓常用個股在網頁開起來時「完全免等待」直接顯示中文！
+    // 內建核心對照表（已修正家碩）
     const localStockDict = {
         "2330.TW": "台積電",
         "0050.TW": "元大台灣50",
@@ -138,13 +138,14 @@
         location.reload();
     }
 
-    // 🔥 核心修復：放棄不穩定的 HTML 爬蟲，改採官方繁體中文 JSON API 管道
+    // 備用非同步獲取名稱 API
     async function fetchStockName(code) {
         if (localStockDict[code]) return localStockDict[code];
         if (nameCache[code]) return nameCache[code];
         try {
             const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${code}&quotesCount=1&newsCount=0&lang=zh-Hant-TW&region=TW`;
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+            // 🔥 升級點 1：改用速度極快的 corsproxy.io 代理通道
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
             const res = await fetch(proxyUrl);
             const data = await res.json();
             
@@ -163,7 +164,7 @@
         const select = document.getElementById('deleteSelect');
         
         if (stockList.length === 0) {
-            container.innerHTML = '<span style="color: #6a737d; font-size: 14px;">目前清單空空如也</span>';
+            container.innerHTML = '<span style="color: #6a737d; font-size: 14px;">目清單空空如也</span>';
         } else {
             container.innerHTML = stockList.map(stock => {
                 const displayName = localStockDict[stock] || nameCache[stock] || stock;
@@ -182,7 +183,6 @@
             select.appendChild(option);
         });
 
-        // 針對非列表內的新增股票，在背景默默向雲端補抓繁中名稱
         stockList.forEach(async (stock) => {
             if (!localStockDict[stock] && !nameCache[stock]) {
                 const name = await fetchStockName(stock);
@@ -194,7 +194,7 @@
         });
     }
 
-    // 智慧型搜尋功能（精準繁中對齊通道）
+    // 智慧型搜尋功能
     async function searchStock() {
         const query = document.getElementById('addInput').value.trim();
         if (!query) { alert('請輸入股票名稱或代碼！'); return; }
@@ -206,9 +206,9 @@
         searchBtn.innerText = "🔍 搜尋中...";
         
         try {
-            // 🔥 強制指定語言為繁體中文 (zh-Hant-TW) 並且地區為台灣 (TW)
             const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=5&newsCount=0&lang=zh-Hant-TW&region=TW`;
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+            // 🔥 升級點 1：改用速度極快的 corsproxy.io 代理通道
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
             
             const res = await fetch(proxyUrl);
             const data = await res.json();
@@ -219,7 +219,6 @@
                 data.quotes.forEach(q => {
                     const option = document.createElement('option');
                     option.value = q.symbol;
-                    // 優先查找內建字典，若無則採用官方回傳的繁中 shortname
                     const finalName = localStockDict[q.symbol] || q.shortname || q.longname || '未知名稱';
                     nameCache[q.symbol] = finalName;
                     option.textContent = `${finalName} (${q.symbol}) - ${q.exchDisp || ''}`;
@@ -227,11 +226,31 @@
                 });
                 select.classList.remove('hidden');
             } else {
-                alert('找不到相符的股票，請嘗試更精準的關鍵字！');
-                select.classList.add('hidden');
+                throw new Error("找不到相符股票");
             }
         } catch (err) {
-            alert('搜尋失敗，請稍後再試：' + err.message);
+            // 🔥 升級點 2：終極防禦！若搜尋伺服器故障，允許使用者「直接暴力手動加入」
+            let formattedCode = query.toUpperCase();
+            if (!formattedCode.includes('.')) {
+                // 自動防呆：幫忙猜測後綴，如果是4碼通常是上市(.TW)
+                formattedCode += (formattedCode.length === 4) ? ".TW" : "";
+            }
+            
+            let confirmForce = confirm(
+                `💡 雲端搜尋轉運站正忙碌中 (Failed to fetch)。\n\n您是否要跳過搜尋，直接將「${formattedCode}」強制加入清單？\n(上市請加.TW，上櫃請加.TWO)`
+            );
+            
+            if (confirmForce) {
+                if (stockList.includes(formattedCode)) {
+                    alert('該股票已經在清單中囉！');
+                } else {
+                    stockList.push(formattedCode);
+                    document.getElementById('addInput').value = '';
+                    renderUI();
+                    showStatus("⚠️ 已手動強制加入代碼，請記得點擊同步更新！", "error");
+                }
+            }
+            select.classList.add('hidden');
         } finally {
             searchBtn.disabled = false;
             searchBtn.innerText = "🔍 搜尋";
@@ -304,7 +323,7 @@
             const updateRes = await fetch(url, {
                 method: "PUT",
                 headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "📱 完美修復繁體中文對照與搜尋機制", content: b64Content, sha: sha })
+                body: JSON.stringify({ message: "📱 升級高速代理與手動強制防呆加入機制", content: b64Content, sha: sha })
             });
             if (updateRes.ok) { 
                 showStatus("🎉 雲端股票名單已秒速更新成功！", "success"); 

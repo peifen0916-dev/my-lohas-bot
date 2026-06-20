@@ -13,10 +13,10 @@ jobs:
 
     steps:
     - name: 檢查程式碼
-      uses: actions/checkout@v4  # 🌟 已升級
+      uses: actions/checkout@v4
 
     - name: 設定 Python 環境
-      uses: actions/setup-python@v5  # 🌟 已升級
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
@@ -26,4 +26,8 @@ jobs:
         pip install pandas yfinance numpy requests
 
     - name: 執行樂活五線譜監控
+      # 🔥 補上了這一區塊，將 GitHub 後台的 Secrets 轉換成 Python 看得見的環境變數
+      env:
+        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: python lohas_monitor.py

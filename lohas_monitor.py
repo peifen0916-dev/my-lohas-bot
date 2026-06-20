@@ -33,7 +33,7 @@ def get_stock_name(stock_code):
         "3293.TWO": "鈊象",
         "8069.TWO": "元太",
         "3711.TW": "日月光投控",
-        "6953.TWO": "巧新",
+        "6953.TWO": "家碩",
         "6625.TW": "必應"
     }
     if stock_code in local_dict:

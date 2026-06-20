@@ -7,35 +7,38 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
-        :root { --bg-color: #f4f6f9; --card-bg: #ffffff; --primary: #2ea44f; --text: #24292e; --gray: #6a737d; --danger: #cf222e; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: var(--bg-color); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        :root { 
+            --bg-color: #f4f6f9; 
+            --card-bg: #ffffff; 
+            --primary: #2ea44f; 
+            --text: #24292e; 
+            --gray: #6a737d; 
+            --danger: #cf222e;
+        }
+        body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .app-container { width: 100%; max-width: 400px; background: var(--card-bg); border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 24px; box-sizing: border-box; }
-        h2 { margin-top: 0; font-size: 22px; text-align: center; color: #1f2328; }
-        .hint { font-size: 13px; color: var(--gray); margin-bottom: 10px; margin-top: 15px; font-weight: 500; }
+        h2 { margin-top: 0; font-size: 22px; text-align: center; }
+        .hint { font-size: 13px; color: var(--gray); margin-bottom: 15px; text-align: center; line-height: 1.5; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #d0d7de; border-radius: 8px; font-size: 16px; box-sizing: border-box; background: #fff; outline: none; }
+        input[type="password"] { background: #fafafa; }
         
-        /* 股票標籤容器樣式 */
-        .stock-container { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; background: #fafafa; border: 1px solid #d0d7de; border-radius: 8px; min-height: 50px; box-sizing: border-box; margin-bottom: 10px; }
-        .stock-tag { display: inline-flex; align-items: center; background: #eff3f6; color: #24292e; border: 1px solid #d0d7de; border-radius: 20px; padding: 5px 12px; font-size: 14px; font-weight: 600; font-family: monospace; }
-        .stock-tag .del-btn { margin-left: 8px; color: var(--danger); cursor: pointer; font-weight: normal; font-size: 12px; }
-        .stock-tag .del-btn:hover { font-weight: bold; }
+        /* 股票標籤視覺化區域 */
+        .section-title { font-size: 14px; font-weight: bold; color: var(--text); margin: 15px 0 6px 0; text-align: left; width: 100%; }
+        .stock-container { background: #fafafa; border: 1px solid #d0d7de; border-radius: 8px; padding: 12px; min-height: 70px; display: flex; flex-wrap: wrap; gap: 6px; box-sizing: border-box; margin-bottom: 15px; }
+        .stock-tag { background: #f1f3f5; color: #343a40; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 14px; border: 1px solid #e9ecef; }
         
-        /* 輸入框並排樣式 */
-        .add-zone { display: flex; gap: 8px; margin-bottom: 20px; }
-        input { width: 100%; padding: 12px; border: 1px solid #d0d7de; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        input:focus { border-color: #0969da; outline: none; box-shadow: 0 0 0 3px rgba(9,105,218,0.15); }
-        #tokenInput { margin-bottom: 15px; }
-        
-        /* 按鈕樣式 */
-        button { background-color: var(--primary); color: white; border: none; padding: 12px 16px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
-        button:hover { opacity: 0.9; }
+        /* 動態操作排版 */
+        .action-block { background: #f8f9fa; padding: 12px; border-radius: 10px; margin-bottom: 12px; border: 1px dashed #d0d7de; }
+        .action-row { display: flex; gap: 8px; margin-top: 5px; }
+        .action-row input, .action-row select { flex: 1; padding: 8px 10px; font-size: 14px; }
+        .btn-sm { width: auto; padding: 8px 14px; font-size: 14px; margin-top: 0; white-space: nowrap; }
+        .btn-add { background-color: #ddf4ff; color: #0969da; }
+        .btn-delete { background-color: #ffebe9; color: var(--danger); }
+
+        button { width: 100%; background-color: var(--primary); color: white; border: none; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 5px; }
         button:disabled { background-color: #94d3a2; cursor: not-allowed; }
-        .btn-block { width: 100%; padding: 14px; font-size: 16px; margin-top: 5px; }
-        .btn-add { white-space: nowrap; padding: 0 20px; }
-        
-        #status { margin-top: 15px; text-align: center; font-weight: bold; font-size: 14px; padding: 10px; border-radius: 6px; }
-        .success { color: #2ea44f; background: #dafbe3; } 
-        .error { color: #cf222e; background: #ffebe9; } 
-        .loading { color: #0969da; background: #ddf4ff; }
+        #status { margin-top: 15px; text-align: center; font-weight: bold; font-size: 14px; }
+        .success { color: #2ea44f; } .error { color: #cf222e; } .loading { color: #0969da; }
         .hidden { display: none; }
     </style>
 </head>
@@ -47,21 +50,36 @@
     <div id="lockZone">
         <div class="hint">請輸入您的 GitHub Fine-grained Token 進行身分驗證（此金鑰將安全儲存在手機本地）：</div>
         <input type="password" id="tokenInput" placeholder="github_pat_...">
-        <button class="btn-block" onclick="saveTokenAndInit()">🔑 驗證並登入</button>
+        <button onclick="saveTokenAndInit()">🔑 驗證並登入</button>
     </div>
 
     <div id="mainZone" class="hidden">
-        <div class="hint">📋 目前雲端監控中的股票清單：</div>
-        <div id="stockListContainer" class="stock-container"></div>
+        <div class="hint">上市股票請加 <b>.TW</b> / 上櫃股票請加 <b>.TWO</b><br>操作完成後請記得點擊下方同步按鈕。</div>
         
-        <div class="hint">➕ 新增單一股票代碼：</div>
-        <div class="add-zone">
-            <input type="text" id="singleStockInput" placeholder="例如: 2330.TW 或 3293.TWO">
-            <button class="btn-add" onclick="addSingleStock()">加入</button>
+        <div class="section-title">📋 目前監控中的股票清單</div>
+        <div id="stockContainer" class="stock-container">
+            </div>
+
+        <div class="action-block">
+            <div class="section-title" style="margin-top:0;">➕ 加入股票</div>
+            <div class="action-row">
+                <input type="text" id="addInput" placeholder="例如: 2454.TW">
+                <button class="btn-sm btn-add" onclick="addStock()">加入</button>
+            </div>
+        </div>
+
+        <div class="action-block">
+            <div class="section-title" style="margin-top:0;">❌ 刪除股票</div>
+            <div class="action-row">
+                <select id="deleteSelect">
+                    <option value="">請選擇股票...</option>
+                </select>
+                <button class="btn-sm btn-delete" onclick="deleteStock()">刪除</button>
+            </div>
         </div>
         
-        <button id="saveBtn" class="btn-block" onclick="updateGitHubFile()">💾 同步更新至雲端 GitHub</button>
-        <button class="btn-block" onclick="clearToken()" style="background-color: var(--danger); margin-top: 12px;">🚪 登出並清除金鑰</button>
+        <button id="saveBtn" onclick="updateGitHubFile()">💾 同步更新至雲端</button>
+        <button onclick="clearToken()" style="background-color: var(--danger); margin-top: 10px;">🚪 登出並清除金鑰</button>
     </div>
     
     <div id="status"></div>
@@ -73,13 +91,11 @@
     const REPO = "my-lohas-bot";
     const FILE_PATH = "lohas_monitor.py";
 
-    // 用來儲存解析後的股票陣列
-    let currentStocks = [];
-
     const statusDiv = document.getElementById('status');
     const saveBtn = document.getElementById('saveBtn');
-    const stockContainer = document.getElementById('stockListContainer');
-    const singleInput = document.getElementById('singleStockInput');
+    
+    // 用來在瀏覽器暫存目前股票陣列的變數
+    let stockList = [];
 
     window.onload = function() {
         const savedToken = localStorage.getItem('lohas_github_token');
@@ -109,68 +125,80 @@
         location.reload();
     }
 
-    // 渲染股票標籤到網頁上
-    function renderStockTags() {
-        stockContainer.innerHTML = "";
-        if (currentStocks.length === 0) {
-            stockContainer.innerHTML = `<div style="color:var(--gray); font-size:13px; text-align:center; width:100%; line-height:26px;">目前清單空空如也，請從下方新增</div>`;
-            return;
+    // 渲染精美的視覺化介面
+    function renderUI() {
+        const container = document.getElementById('stockContainer');
+        const select = document.getElementById('deleteSelect');
+        
+        // 1. 渲染目前的股票標籤
+        if (stockList.length === 0) {
+            container.innerHTML = '<span style="color: #6a737d; font-size: 14px;">目前清單空空如也</span>';
+        } else {
+            container.innerHTML = stockList.map(stock => `<span class="stock-tag">${stock}</span>`).join('');
         }
-        currentStocks.forEach((stock, index) => {
-            const tag = document.createElement('span');
-            tag.className = 'stock-tag';
-            tag.innerHTML = `${stock} <span class="del-btn" onclick="deleteStock(${index})">❌</span>`;
-            stockContainer.appendChild(tag);
+
+        // 2. 刷新刪除下拉選單
+        select.innerHTML = '<option value="">請選擇股票...</option>';
+        stockList.forEach(stock => {
+            const option = document.createElement('option');
+            option.value = stock;
+            option.textContent = stock;
+            select.appendChild(option);
         });
     }
 
-    // 新增單檔股票到暫存清單
-    function addSingleStock() {
-        let stockCode = singleInput.value.trim().toUpperCase();
-        if (!stockCode) {
-            showStatus("❌ 請輸入股票代碼！", "error");
+    // 加入股票邏輯
+    function addStock() {
+        const input = document.getElementById('addInput');
+        let code = input.value.trim().toUpperCase(); // 自動轉大寫防呆
+        
+        if (!code) {
+            alert('請輸入股票代碼！');
             return;
         }
-        if (currentStocks.includes(stockCode)) {
-            showStatus(`⚠️ 股票 ${stockCode} 已經在清單中囉！`, "error");
+        if (stockList.includes(code)) {
+            alert('該股票已經在清單中囉！');
             return;
         }
-        currentStocks.push(stockCode);
-        renderStockTags();
-        singleInput.value = "";
-        showStatus("💡 已加入暫存，調整完畢後請記得點擊下方「同步更新至雲端」", "success");
+        
+        stockList.push(code);
+        input.value = ''; // 清空輸入框
+        renderUI(); // 重新整理網頁畫面
     }
 
-    // 從暫存清單刪除單檔股票
-    function deleteStock(index) {
-        const removed = currentStocks[index];
-        currentStocks.splice(index, 1);
-        renderStockTags();
-        showStatus(`💡 已移出 ${removed}，調整完畢後請記得點擊下方「同步更新至雲端」`, "success");
+    // 刪除股票邏輯
+    function deleteStock() {
+        const select = document.getElementById('deleteSelect');
+        let target = select.value;
+        
+        if (!target) {
+            alert('請先選取一檔要刪除的股票！');
+            return;
+        }
+        
+        stockList = stockList.filter(item => item !== target);
+        renderUI(); // 重新整理網頁畫面
     }
 
-    // 遠端讀取 GitHub 上的檔案並解析
     async function fetchCurrentList() {
         showStatus("🔍 正在讀取雲端最新股票清單...", "loading");
         saveBtn.disabled = true;
         try {
-            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}?nocache=${new Date().getTime()}`;
+            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
             const res = await fetch(url, { headers: { "Authorization": `token ${GITHUB_TOKEN}` } });
             if (!res.ok) throw new Error("讀取失敗，請確認 Token 權限或是否勾選正確專案");
             const data = await res.json();
             const fileContent = decodeURIComponent(escape(atob(data.content)));
+            const match = fileContent.match(/stock_list\s*=\s*(\[[\s\S]*?\])/);
             
-            // 精準抓取 Python 裡面的 stock_list = [...] 或 DEFAULT_STOCKS = [...]
-            // 優先對接含有多個股票的陣列
-            const match = fileContent.match(/(?:stock_list|DEFAULT_STOCKS)\s*=\s*(\[[\s\S]*?\])/);
             if (match) {
-                // 將 Python 陣列格式轉成 JavaScript 可解析的 JSON
-                const jsonValidText = match[1].replace(/'/g, '"').replace(/,\s*\]/, ']');
-                currentStocks = JSON.parse(jsonValidText);
-                renderStockTags();
+                let rawArrayStr = match[1].replace(/'/g, '"').replace(/“|”/g, '"'); // 移除可能的髒資料引號
+                stockList = JSON.parse(rawArrayStr);
+                
+                renderUI(); // 轉化成功後渲染新介面
                 showStatus("✅ 已同步最新雲端資料", "success");
             } else {
-                showStatus("❌ 找不到股票清單變變數", "error");
+                showStatus("❌ 找不到股票清單變數", "error");
             }
         } catch (err) {
             showStatus("❌ " + err.message, "error");
@@ -178,8 +206,9 @@
         } finally { saveBtn.disabled = false; }
     }
 
-    // 將調整好的清單打包成 Python 格式，並 PUT 回 GitHub
     async function updateGitHubFile() {
+        const newListText = JSON.stringify(stockList); 
+        
         showStatus("🚀 正在送出更新至 GitHub...", "loading");
         saveBtn.disabled = true;
         try {
@@ -188,29 +217,17 @@
             const fileData = await res.json();
             const sha = fileData.sha;
             const oldContent = decodeURIComponent(escape(atob(fileData.content)));
-            
-            // 將最新的陣列轉回漂亮的 Python 縮排字串
-            const formattedListText = "[\n" + currentStocks.map(s => `    "${s}",`).join("\n") + "\n]";
-            
-            // 取代原本 lohas_monitor.py 裡的變數內容
-            // 同時兼容 stock_list 和 DEFAULT_STOCKS 的取代
-            let newContent = oldContent;
-            if (oldContent.includes("stock_list =")) {
-                newContent = oldContent.replace(/stock_list\s*=\s*\[[\s\S]*?\]/, `stock_list = ${formattedListText}`);
-            } else if (oldContent.includes("DEFAULT_STOCKS =")) {
-                newContent = oldContent.replace(/DEFAULT_STOCKS\s*=\s*\[[\s\S]*?\]/, `DEFAULT_STOCKS = ${formattedListText}`);
-            }
-            
+            const newContent = oldContent.replace(/stock_list\s*=\s*\[[\s\S]*?\]/, `stock_list = ${newListText}`);
             const b64Content = btoa(unescape(encodeURIComponent(newContent)));
             const updateRes = await fetch(url, {
                 method: "PUT",
                 headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "📱 手機網頁後台：增刪股票清單", content: b64Content, sha: sha })
+                body: JSON.stringify({ message: "📱 手機後台優化介面更新", content: b64Content, sha: sha })
             });
             if (updateRes.ok) { 
                 showStatus("🎉 雲端股票名單已秒速更新成功！", "success"); 
             } else { 
-                throw new Error("GitHub 回報錯誤，請確認 Token 權限"); 
+                throw new Error("GitHub 回報錯誤"); 
             }
         } catch (err) { 
             showStatus("❌ 更新失敗: " + err.message, "error"); 
@@ -218,7 +235,7 @@
             saveBtn.disabled = false; 
         }
     }
-
+    
     function showStatus(msg, type) { statusDiv.innerText = msg; statusDiv.className = type; }
 </script>
 </body>

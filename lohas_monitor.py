@@ -19,39 +19,6 @@ STOCK_PERIOD_MAP = {
     "8069.TWO": "6mo",   # 元太
 }
 
-# ==============================================================================
-# 📈 樂活五線譜與技術指標監控自動化腳本 (LOHAS Monitor Bot)
-# ==============================================================================
-
-def get_stock_name(stock_code):
-    """
-    🔥 核心優化：結合內建精準繁中字典與官方繁中 JSON 通道，確保名稱解碼絕對正確
-    """
-    local_dict = {
-        "2330.TW": "台積電",
-        "0050.TW": "元大台灣50",
-        "3293.TWO": "鈊象",
-        "8069.TWO": "元太",
-        "3711.TW": "日月光投控",
-        "6953.TWO": "家碩",
-        "6625.TW": "必應"
-    }
-    if stock_code in local_dict:
-        return local_dict[stock_code]
-
-    # 若為未來新加入的股票，改走官方繁體中文 JSON API 管道
-    url = f"https://query1.finance.yahoo.com/v1/finance/search?q={stock_code}&quotesCount=1&newsCount=0&lang=zh-Hant-TW&region=TW"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    try:
-        res = requests.get(url, headers=headers, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            if data.get("quotes") and len(data["quotes"]) > 0:
-                return data["quotes"][0].get("shortname") or data["quotes"][0].get("longname") or stock_code
-    except Exception as e:
-        print(f"⚠️ 無法取得 {stock_code} 的中文名稱: {e}")
-    return stock_code
-
 def calculate_lohas_lines(df):
     """ 計算樂活五線譜的核心數學邏輯 """
     if len(df) < 30:
@@ -115,7 +82,8 @@ def send_telegram_message(message):
         print(f"❌ 推送時發生異常網路錯誤: {e}")
 
 # ==============================================================================
-# ⚠️ 核心注意：下方的 stock_list 變數會被前端管理網頁 (GitHub Pages) 動態識別與修改。
+# ⚠️ 核心注意：下方的 stock_dict 變數會被前端管理網頁 (GitHub Pages) 動態識別與修改。
+# 這裡儲存的資料會由網頁直接更新「代碼:中文名」，完全不需要再透過爬蟲抓取！
 # ==============================================================================
 
 
@@ -126,16 +94,17 @@ def send_telegram_message(message):
 
 
 
-stock_list = ["0050.TW","2330.TW","3711.TW","8069.TWO","6953.TWO","3293.TWO","6625.TW","0056.TW"]
+stock_dict = {"0050.TW": "元大台灣50", "2330.TW": "台積電", "3711.TW": "日月光投控", "8069.TWO": "元太", "6953.TWO": "家碩", "3293.TWO": "鈊象", "6625.TW": "必應", "0056.TW": "元大高股息"}
 
 def main():
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監程排程...")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監控排程...")
     report_msg = "\n📊 樂活盯盤量化分析報告 📊\n"
     has_valid_data = False
     
-    for stock in stock_list:
+    # 🔥 核心改變：直接遍歷字典，秒速取得股票代碼與對應的繁體中文名稱
+    for stock, stock_name in stock_dict.items():
         try:
-            print(f" 🔍 正在處理標的: {stock} ...")
+            print(f" 🔍 正在處理標的: {stock_name} ({stock}) ...")
             ticker = yf.Ticker(stock)
             
             current_period = STOCK_PERIOD_MAP.get(stock, DEFAULT_PERIOD)
@@ -156,8 +125,6 @@ def main():
             current_price = lohas['current']
             channel_top = channel['top']
             channel_bottom = channel['bottom']
-            
-            stock_name = get_stock_name(stock)
             
             if current_price <= lohas['dn2']:
                 position_status = "🔥 超跌 (低於極度悲觀線)"

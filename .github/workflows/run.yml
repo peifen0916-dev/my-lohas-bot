@@ -3,7 +3,7 @@ name: Lohas 5-Line Daily Monitor
 on:
   schedule:
     # 每天台灣時間中午 12:00 自動執行 (等於 UTC 時間 04:00)
-    - cron: '0 4 * * *'
+    - cron: '16 4 * * 1-5'
   workflow_dispatch:
     # 允許您未來透過網頁或手機 App 手動點擊按鈕，立刻強制執行
 

@@ -83,7 +83,6 @@ def send_telegram_message(message):
 
 # ==============================================================================
 # ⚠️ 核心注意：下方的 stock_dict 變數會被前端管理網頁 (GitHub Pages) 動態識別與修改。
-# 這裡儲存的資料會由網頁直接更新「代碼:中文名」，完全不需要再透過爬蟲抓取！
 # ==============================================================================
 
 
@@ -94,14 +93,13 @@ def send_telegram_message(message):
 
 
 
-stock_dict = {"0050.TW":"元大台灣50","2330.TW":"台積電","3711.TW":"日月光投控","8069.TWO":"元太","6953.TWO":"家碩","3293.TWO":"鈊象","6625.TW":"必應"}
+stock_dict = {"0050.TW": "元大台灣50", "2330.TW": "台積電", "3711.TW": "日月光投控", "8069.TWO": "元太", "6953.TWO": "家碩", "3293.TWO": "鈊象", "6625.TW": "必應", "0056.TW": "元大高股息"}
 
 def main():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監控排程...")
     report_msg = "\n📊 樂活盯盤量化分析報告 📊\n"
     has_valid_data = False
     
-    # 🔥 核心改變：直接遍歷字典，秒速取得股票代碼與對應的繁體中文名稱
     for stock, stock_name in stock_dict.items():
         try:
             print(f" 🔍 正在處理標的: {stock_name} ({stock}) ...")
@@ -125,23 +123,45 @@ def main():
             current_price = lohas['current']
             channel_top = channel['top']
             channel_bottom = channel['bottom']
+            reg_middle = lohas['reg']
             
-            if current_price <= lohas['dn2']:
-                position_status = "🔥 超跌 (低於極度悲觀線)"
-                price_zone = "low"
-            elif current_price <= lohas['dn1']:
-                position_status = "📉 偏低 (低於相對悲觀線)"
-                price_zone = "low"
-            elif current_price >= lohas['up2']:
+            # 🔥 1. 判斷五線譜區間與數字位階 (1 ~ 6)
+            if current_price >= lohas['up2']:
                 position_status = "⚠️ 超漲 (高於極度樂觀線)"
+                lohas_line_level = 6
                 price_zone = "high"
             elif current_price >= lohas['up1']:
                 position_status = "📈 偏高 (高於相對樂觀線)"
+                lohas_line_level = 5
                 price_zone = "high"
-            else:
-                position_status = "⚖️ 正常 (常態均值區間)"
+            elif current_price >= reg_middle:
+                position_status = "⚖️ 正常 (均值~相對樂觀區間)"
+                lohas_line_level = 4
                 price_zone = "normal"
+            elif current_price >= lohas['dn1']:
+                position_status = "⚖️ 正常 (相對悲觀~均值區間)"
+                lohas_line_level = 3
+                price_zone = "normal"
+            elif current_price >= lohas['dn2']:
+                position_status = "📉 偏低 (低於相對悲觀線)"
+                lohas_line_level = 2
+                price_zone = "low"
+            else:
+                position_status = "🔥 超跌 (低於極度悲觀線)"
+                lohas_line_level = 1
+                price_zone = "low"
                 
+            # 🔥 2. 判斷樂活通道區間與數字位階 (1 ~ 4)
+            if current_price >= channel_top:
+                channel_level = 4
+            elif current_price >= reg_middle:
+                channel_level = 3
+            elif current_price >= channel_bottom:
+                channel_level = 2
+            else:
+                channel_level = 1
+                
+            # 3. 結合樂活雙指標進行操盤訊號判讀
             if price_zone == "low":
                 if current_price > channel_top:
                     trade_signal = "🟢 買進訊號 (低檔轉強，突破通道上線)"
@@ -155,11 +175,12 @@ def main():
             else:
                 trade_signal = "⚪ 持有觀望 (常態均值區，無強烈買賣訊號)"
                 
+            # 🔥 4. 組裝包含數字化區間的全新訊息格式
             report_msg += (
                 f"\n【{stock_name} / {stock}】({current_period}區間)\n"
                 f" 💰 當前收盤: {current_price:.2f}\n"
-                f" 🎯 五線位階: {position_status}\n"
-                f" 🔮 通道範圍: {channel_bottom:.2f} ~ {channel_top:.2f}\n"
+                f" 🎯 五線位階: {position_status} ［區間：{lohas_line_level}］\n"
+                f" 🔮 通道範圍: {channel_bottom:.2f} ~ {channel_top:.2f} ［區間：{channel_level}］\n"
                 f" ⚡ 操盤訊號: {trade_signal}\n"
                 f" 📊 技術指標: K={k_val:.1f} / D={d_val:.1f}\n"
             )

@@ -7,18 +7,6 @@ import yfinance as yf
 import requests
 from datetime import datetime
 
-# ==============================================================================
-# ⚙️ 策略參數自訂區（客製化個股看盤區間）
-# ==============================================================================
-DEFAULT_PERIOD = "1y" 
-
-STOCK_PERIOD_MAP = {
-    "0050.TW": "3y",     # 元大台灣50
-    "2330.TW": "3y",     # 台積電
-    "3293.TWO": "3mo",   # 鈊象
-    "8069.TWO": "6mo",   # 元太
-}
-
 def calculate_lohas_lines(df):
     """ 計算樂活五線譜的核心數學邏輯 """
     if len(df) < 30:
@@ -83,6 +71,7 @@ def send_telegram_message(message):
 
 # ==============================================================================
 # ⚠️ 核心注意：下方的 stock_dict 變數會被前端管理網頁 (GitHub Pages) 動態識別與修改。
+# 網頁端會將資料儲存為："代碼": "中文名,時間區間"
 # ==============================================================================
 
 
@@ -93,19 +82,26 @@ def send_telegram_message(message):
 
 
 
-stock_dict = {"0050.TW": "元大台灣50", "2330.TW": "台積電", "3711.TW": "日月光投控", "8069.TWO": "元太", "6953.TWO": "家碩", "3293.TWO": "鈊象", "6625.TW": "必應", "0056.TW": "元大高股息"}
+stock_dict = {"0050.TW": "元大台灣50,3y", "2330.TW": "台積電,3y", "3711.TW": "日月光投控,1y", "8069.TWO": "元太,6mo", "6953.TWO": "家碩,1y", "3293.TWO": "鈊象,3mo", "6625.TW": "必應,1y", "0056.TW": "元大高股息,1y"}
 
 def main():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監控排程...")
     report_msg = "\n📊 樂活盯盤量化分析報告 📊\n"
     has_valid_data = False
     
-    for stock, stock_name in stock_dict.items():
+    for stock, raw_val in stock_dict.items():
         try:
-            print(f" 🔍 正在處理標的: {stock_name} ({stock}) ...")
+            # 🔥 核心優化：從網頁傳回的打包數值中，拆解出中文名稱與自訂區間
+            if "," in raw_val:
+                stock_name, current_period = raw_val.split(',')
+            else:
+                stock_name = raw_val
+                current_period = "1y" # 防呆兜底：若無舊資料則預設1年
+                
+            print(f" 🔍 正在處理標的: {stock_name} ({stock}) | 採用區間: {current_period} ...")
             ticker = yf.Ticker(stock)
             
-            current_period = STOCK_PERIOD_MAP.get(stock, DEFAULT_PERIOD)
+            # 🔥 100% 聽從網頁指示的動態時間區間！
             df = ticker.history(period=current_period)
             
             if df.empty:
@@ -125,7 +121,7 @@ def main():
             channel_bottom = channel['bottom']
             reg_middle = lohas['reg']
             
-            # 🔥 1. 判斷五線譜區間與數字位階 (1 ~ 6)
+            # 判斷五線譜區與數字位階 (1 ~ 6)
             if current_price >= lohas['up2']:
                 position_status = "⚠️ 超漲 (高於極度樂觀線)"
                 lohas_line_level = 6
@@ -151,7 +147,7 @@ def main():
                 lohas_line_level = 1
                 price_zone = "low"
                 
-            # 🔥 2. 判斷樂活通道區間與數字位階 (1 ~ 4)
+            # 判斷樂活通道區間與數字位階 (1 ~ 4)
             if current_price >= channel_top:
                 channel_level = 4
             elif current_price >= reg_middle:
@@ -161,7 +157,7 @@ def main():
             else:
                 channel_level = 1
                 
-            # 3. 結合樂活雙指標進行操盤訊號判讀
+            # 結合樂活雙指標進行操盤訊號判讀
             if price_zone == "low":
                 if current_price > channel_top:
                     trade_signal = "🟢 買進訊號 (低檔轉強，突破通道上線)"
@@ -175,7 +171,6 @@ def main():
             else:
                 trade_signal = "⚪ 持有觀望 (常態均值區，無強烈買賣訊號)"
                 
-            # 🔥 4. 組裝包含數字化區間的全新訊息格式
             report_msg += (
                 f"\n【{stock_name} / {stock}】({current_period}區間)\n"
                 f" 💰 當前收盤: {current_price:.2f}\n"

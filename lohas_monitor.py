@@ -82,7 +82,7 @@ def send_telegram_message(message):
 
 
 
-stock_dict = {"0050.TW":"元大台灣50,3y","2330.TW":"台積電,3y","3711.TW":"日月光投控,1y","8069.TWO":"元太,6mo","6953.TWO":"家碩,1y","3293.TWO":"鈊象,3mo","6625.TW":"必應,1y"}
+stock_dict = {"0050.TW": "元大台灣50,3y", "2330.TW": "台積電,3y", "3711.TW": "日月光投控,1y", "8069.TWO": "元太,6mo", "6953.TWO": "家碩,1y", "3293.TWO": "鈊象,3mo", "6625.TW": "必應,1y", "0056.TW": "元大高股息,1y"}
 
 def main():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 啟動樂活策略多空監控排程...")

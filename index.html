@@ -24,9 +24,13 @@
         
         /* 股票標籤視覺化區域 */
         .section-title { font-size: 14px; font-weight: bold; color: var(--text); margin: 15px 0 6px 0; text-align: left; width: 100%; }
-        .stock-container { background: #fafafa; border: 1px solid #d0d7de; border-radius: 8px; padding: 12px; min-height: 70px; display: flex; flex-wrap: wrap; gap: 6px; box-sizing: border-box; margin-bottom: 15px; }
-        .stock-tag { background: #f1f3f5; color: #343a40; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 14px; border: 1px solid #e9ecef; }
+        .stock-container { background: #fafafa; border: 1px solid #d0d7de; border-radius: 8px; padding: 12px; min-height: 70px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; margin-bottom: 15px; }
         
+        /* 🔥 新增股票列：左邊名稱，右邊選擇區間 */
+        .stock-row { display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 8px 12px; border-radius: 8px; border: 1px solid #e1e4e8; width: 100%; box-sizing: border-box; }
+        .stock-info { font-weight: 600; font-size: 14px; color: #343a40; }
+        .period-select-sm { width: auto; padding: 4px 8px; font-size: 13px; border-radius: 6px; border: 1px solid #d0d7de; background: #f6f8fa; }
+
         /* 動態操作排版 */
         .action-block { background: #f8f9fa; padding: 12px; border-radius: 10px; margin-bottom: 12px; border: 1px dashed #d0d7de; }
         .action-row { display: flex; gap: 8px; margin-top: 5px; }
@@ -54,7 +58,7 @@
     </div>
 
     <div id="mainZone" class="hidden">
-        <div class="hint">輸入股票名稱或代碼點擊搜尋，系統會自動轉換為 Yahoo 專用代碼。</div>
+        <div class="hint">輸入股票名稱或代碼搜尋加入。您可以直接在股票右側隨時修改看盤時間區間。</div>
         
         <div class="section-title">📋 目前監控中的股票清單</div>
         <div id="stockContainer" class="stock-container"></div>
@@ -126,27 +130,53 @@
         location.reload();
     }
 
-    // 渲染介面
+    // 💡 核心渲染邏輯改動：渲染出帶有下拉選單的股票列
     function renderUI() {
         const container = document.getElementById('stockContainer');
         const select = document.getElementById('deleteSelect');
         const codes = Object.keys(stockDict);
         
         if (codes.length === 0) {
-            container.innerHTML = '<span style="color: #6a737d; font-size: 14px;">目前清單空空如也</span>';
+            container.innerHTML = '<span style="color: #6a737d; font-size: 14px; text-align:center; display:block; padding:10px;">目前清單空空如也</span>';
         } else {
             container.innerHTML = codes.map(code => {
-                return `<span class="stock-tag">${stockDict[code]} (${code})</span>`;
+                // 解開打包資料
+                const rawVal = stockDict[code];
+                const name = rawVal.includes(',') ? rawVal.split(',')[0] : rawVal;
+                const period = rawVal.includes(',') ? rawVal.split(',')[1] : "1y"; // 沒填預設1年
+                
+                return `
+                    <div class="stock-row">
+                        <div class="stock-info">${name} (${code})</div>
+                        <select class="period-select-sm" onchange="updatePeriod('${code}', this.value)">
+                            <option value="3mo" ${period==='3mo'?'selected':''}>3個月</option>
+                            <option value="6mo" ${period==='6mo'?'selected':''}>6個月</option>
+                            <option value="1y" ${period==='1y'?'selected':''}>1年</option>
+                            <option value="2y" ${period==='2y'?'selected':''}>2年</option>
+                            <option value="3y" ${period==='3y'?'selected':''}>3年</option>
+                            <option value="5y" ${period==='5y'?'selected':''}>5年</option>
+                        </select>
+                    </div>
+                `;
             }).join('');
         }
 
         select.innerHTML = '<option value="">請選擇股票...</option>';
         codes.forEach(code => {
+            const rawVal = stockDict[code];
+            const name = rawVal.includes(',') ? rawVal.split(',')[0] : rawVal;
             const option = document.createElement('option');
             option.value = code;
-            option.textContent = `${stockDict[code]} (${code})`;
+            option.textContent = `${name} (${code})`;
             select.appendChild(option);
         });
+    }
+
+    // 🔥 當使用者在網頁上隨時調整下拉選單時，動態更新本地變數
+    function updatePeriod(code, newPeriod) {
+        const rawVal = stockDict[code];
+        const name = rawVal.includes(',') ? rawVal.split(',')[0] : rawVal;
+        stockDict[code] = `${name},${newPeriod}`; // 重新打包
     }
 
     // 智慧型搜尋功能
@@ -190,7 +220,7 @@
             
             let customName = prompt(`💡 雲端搜尋忙碌中。是否要直接強制加入代碼「${formattedCode}」？\n\n請輸入這檔股票的中文名稱：`, "新股票");
             if (customName) {
-                stockDict[formattedCode] = customName.trim();
+                stockDict[formattedCode] = `${customName.trim()},1y`; // 打包預設區間1年
                 document.getElementById('addInput').value = '';
                 renderUI();
                 showStatus("⚠️ 已手動強制加入，請記得點擊同步更新！", "error");
@@ -202,7 +232,6 @@
         }
     }
 
-    // 🔥 核心優化點：當點選下拉選單加入股票時，強制彈出對話框讓使用者確認/修改繁體中文名字
     function confirmAddStock() {
         const select = document.getElementById('searchResultSelect');
         const code = select.value;
@@ -217,22 +246,13 @@
         const selectedOption = select.options[select.selectedIndex];
         const detectedName = selectedOption.getAttribute('data-name');
         
-        // 跳出提示框，預填 Yahoo 給的名字（可能是英文），方便使用者當場修正為繁體中文
-        let userConfirmedName = prompt(
-            `已選取代碼: ${code}\n\n請確認或修改要在網頁與 Telegram 顯示的中文名稱：`, 
-            detectedName
-        );
+        let userConfirmedName = prompt(`已選取代碼: ${code}\n\n請確認或修改中文名稱：`, detectedName);
+        if (userConfirmedName === null) { select.value = ""; return; }
         
-        // 如果使用者點擊「取消」，就不加入
-        if (userConfirmedName === null) {
-            select.value = "";
-            return;
-        }
-        
-        // 確保有名稱，若留空則用自動偵測的名字
         const finalName = userConfirmedName.trim() ? userConfirmedName.trim() : detectedName;
         
-        stockDict[code] = finalName; 
+        // 🔥 加入時，預設打包「1y」區間
+        stockDict[code] = `${finalName},1y`; 
         document.getElementById('addInput').value = '';
         select.classList.add('hidden');
         select.value = "";
@@ -286,10 +306,10 @@
             const updateRes = await fetch(url, {
                 method: "PUT",
                 headers: { "Authorization": `token ${GITHUB_TOKEN}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "📱 升級自訂中文名稱加入機制", content: b64Content, sha: sha })
+                body: JSON.stringify({ message: "📱 網頁端完全自主化區間欄位優化更新", content: b64Content, sha: sha })
             });
             if (updateRes.ok) { 
-                showStatus("🎉 雲端股票名單已秒速更新成功！", "success"); 
+                showStatus("🎉 雲端股票名單與區間已更新成功！", "success"); 
             } else { 
                 throw new Error("GitHub 回報錯誤"); 
             }

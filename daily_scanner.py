@@ -10,8 +10,8 @@ from telegram_bot import send_telegram_message, format_scan_report
 # =========================================================================
 # ⚙️ 設定區：優先讀取 GitHub Secrets / 系統環境變數
 # =========================================================================
-TELEGRAM_TOKEN = os.environ.get("8288347537:AAHh3tAJO0DiuQEEM05iJZsJMimvmAcDWGY", "YOUR_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("229223968", "YOUR_CHAT_ID")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "YOUR_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "YOUR_CHAT_ID")
 
 STOCK_POOL = [
     "2330.TW", "2317.TW", "2454.TW", "2308.TW", "2382.TW",
